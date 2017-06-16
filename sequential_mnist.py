@@ -7,7 +7,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
 
-total_epochs = 1000
+total_epochs = 5
 mini_batch_size = 50
 train_size = mnist.train.num_examples
 total_mini_batch_number = int(np.ceil(train_size/mini_batch_size))
@@ -16,8 +16,6 @@ time_steps = 28
 hidden_layer_shape = 128
 input_shape = 28
 output_shape = 10
-
-time_step_slices = int(np.ceil(784/time_steps))
 
 class Vanilla_RNN_cell(object):
 	""" 
@@ -33,12 +31,21 @@ class Vanilla_RNN_cell(object):
 
 		# Weights matrices and bias
 
-		self.Wx = tf.Variable(tf.truncated_normal([input_shape, hidden_layer_shape], mean = 0, stddev = 0.01))
-		self.Wh = tf.Variable(tf.truncated_normal([hidden_layer_shape, hidden_layer_shape], mean = 0, stddev = 0.01))
-		self.Wo = tf.Variable(tf.truncated_normal([hidden_layer_shape, output_shape], mean = 0, stddev = 0.01))
+		self.Wx = tf.Variable(tf.truncated_normal([input_shape, hidden_layer_shape], mean = 0, stddev = 0.01), name = 'Wx')
+		self.Wh = tf.Variable(tf.truncated_normal([hidden_layer_shape, hidden_layer_shape], mean = 0, stddev = 0.01), name = 'Wh')
+		self.Wo = tf.Variable(tf.truncated_normal([hidden_layer_shape, output_shape], mean = 0, stddev = 0.01), name = 'Wo')
 	
-		self.bias_hidden = tf.Variable(tf.zeros([hidden_layer_shape]))
-		self.bias_out = tf.Variable(tf.zeros([output_shape]))
+		self.bias_hidden = tf.Variable(tf.zeros([hidden_layer_shape]), name = 'bias_hidden')
+		self.bias_out = tf.Variable(tf.zeros([output_shape]), name = 'bias_out')
+
+		
+		'''
+		tf.add_to_collection('vars', self.Wx)
+		tf.add_to_collection('vars', self.Wh)
+		tf.add_to_collection('vars', self.Wo)
+		tf.add_to_collection('vars', self.bias_hidden)
+		tf.add_to_collection('vars', self.bias_out)
+		'''
 
 	def vanilla_rnn(self, previous_hidden_state, current_input):
 		"""
@@ -96,10 +103,13 @@ correct_predictions = tf.equal(tf.argmax(targets, 1), tf.argmax(tf.nn.softmax(la
 
 acc = (tf.reduce_mean(tf.cast(correct_predictions, tf.float32)))*100
 
-sess = tf.InteractiveSession()
-sess.run(tf.global_variables_initializer())
+sess = tf.Session()
+saver = tf.train.Saver()
+
+initializer = tf.global_variables_initializer() 
 
 # Training loop
+sess.run(initializer)
 for epc in range(total_epochs):
 	for i in range(total_mini_batch_number):
 
@@ -113,12 +123,14 @@ for epc in range(total_epochs):
 		test_input_mini_batch = test_mini_batch[0].reshape([mini_batch_size, time_steps, input_shape])
 		test_targets_mini_batch = test_mini_batch[1]
 
-		sess.run(train_step,feed_dict={input_placeholder: input_mini_batch, targets: targets_mini_batch, initial_state: initial_state_mini_batch})
+		sess.run(train_step, feed_dict={input_placeholder: input_mini_batch, targets: targets_mini_batch, initial_state: initial_state_mini_batch})
 
 				
 	train_acc = str(sess.run(acc, feed_dict={input_placeholder: input_mini_batch, targets: targets_mini_batch, initial_state: initial_state_mini_batch}))
 	test_acc = str(sess.run(acc, feed_dict={input_placeholder:test_input_mini_batch, targets: test_targets_mini_batch, initial_state: initial_state_mini_batch}))
     
 	sys.stdout.flush()
-	print("Epoch: %s Train Accuracy: %s Test Accuracy: %s" %(epc, train_acc, test_acc)),
+	print("\r Epoch: %s Train Accuracy: %s Test Accuracy: %s" %(epc, train_acc, test_acc)),
 	sys.stdout.flush()
+
+	saver.save(sess, 'saved_model')
